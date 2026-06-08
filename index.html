@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spanish Vocabulary Practice</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🇪🇸 Spanish Vocabulary Practice</h1>
+    <nav class="tabs">
+      <button class="tab active" data-tab="practice">Practice</button>
+      <button class="tab" data-tab="bank">Word Bank</button>
+      <button class="tab" data-tab="stats">Progress</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ PRACTICE ============ -->
+    <section id="practice" class="panel active">
+      <!-- Setup screen: choose mode + scope, then start -->
+      <div id="practice-setup" class="card">
+        <h2>Start a practice session</h2>
+
+        <div class="field">
+          <label>Question type</label>
+          <div class="choice-row" id="mode-choices">
+            <button class="choice selected" data-mode="mc">
+              <strong>Multiple choice</strong>
+              <span>See a Spanish word, pick the English meaning</span>
+            </button>
+            <button class="choice" data-mode="fr">
+              <strong>Free response</strong>
+              <span>See an English word, type the Spanish</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Which words?</label>
+          <div class="choice-row" id="scope-choices">
+            <button class="choice selected" data-scope="needs">
+              <strong>Needs work</strong>
+              <span>Focus on words you haven't mastered yet</span>
+            </button>
+            <button class="choice" data-scope="all">
+              <strong>All words</strong>
+              <span>Practice your entire word bank</span>
+            </button>
+          </div>
+        </div>
+
+        <p id="setup-summary" class="muted"></p>
+        <button id="start-btn" class="primary big">Start practicing</button>
+      </div>
+
+      <!-- Active question screen -->
+      <div id="practice-active" class="card hidden">
+        <div class="session-bar">
+          <span id="session-progress" class="muted"></span>
+          <button id="end-session" class="link-btn">End session</button>
+        </div>
+
+        <div class="prompt-box">
+          <span id="prompt-label" class="prompt-label"></span>
+          <span id="prompt-word" class="prompt-word"></span>
+        </div>
+
+        <!-- Multiple choice options -->
+        <div id="mc-options" class="mc-options hidden"></div>
+
+        <!-- Free response -->
+        <div id="fr-area" class="fr-area hidden">
+          <input id="fr-input" type="text" autocomplete="off" autocapitalize="off"
+                 spellcheck="false" placeholder="Type the Spanish word…" />
+          <div class="accent-keys" id="accent-keys"></div>
+          <button id="fr-submit" class="primary">Check answer</button>
+        </div>
+
+        <!-- Feedback -->
+        <div id="feedback" class="feedback hidden">
+          <div id="feedback-text"></div>
+          <button id="next-btn" class="primary">Next →</button>
+        </div>
+      </div>
+
+      <!-- Session results -->
+      <div id="practice-results" class="card hidden">
+        <h2>Session complete 🎉</h2>
+        <p id="results-text" class="muted"></p>
+        <div id="results-detail"></div>
+        <button id="again-btn" class="primary big">Practice again</button>
+      </div>
+    </section>
+
+    <!-- ============ WORD BANK ============ -->
+    <section id="bank" class="panel">
+      <div class="card">
+        <h2>Add a word</h2>
+        <form id="add-form" class="add-form">
+          <div class="field">
+            <label for="add-spanish">Spanish</label>
+            <input id="add-spanish" type="text" autocomplete="off" autocapitalize="off"
+                   spellcheck="false" placeholder="e.g. el perro" required />
+            <div class="accent-keys" id="add-accent-keys"></div>
+          </div>
+          <div class="field">
+            <label for="add-english">English</label>
+            <input id="add-english" type="text" autocomplete="off"
+                   placeholder="e.g. the dog" required />
+          </div>
+          <button type="submit" class="primary">Add word</button>
+          <p class="hint muted">Tip: separate synonyms with a slash, e.g. <code>quick / fast</code>.</p>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="bank-header">
+          <h2>Your words (<span id="word-count">0</span>)</h2>
+          <input id="search" type="search" placeholder="Search…" />
+        </div>
+        <div id="word-list" class="word-list"></div>
+        <div class="bank-actions">
+          <button id="export-btn" class="secondary">Export backup (JSON)</button>
+          <button id="import-btn" class="secondary">Import backup</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STATS ============ -->
+    <section id="stats" class="panel">
+      <div class="card">
+        <h2>Your progress</h2>
+        <div class="stat-grid" id="stat-grid"></div>
+      </div>
+      <div class="card">
+        <h2>Mastery breakdown</h2>
+        <div id="mastery-list" class="mastery-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
