@@ -49,6 +49,31 @@ Each word has a confidence **level from 0 to 5** (Leitner-style):
 
 The **Progress** tab shows totals and a breakdown of words by level.
 
+## Cross-device sync (optional)
+
+By default your bank is stored only in the browser you're using. To carry it
+across devices, the **Word Bank → Cross-device sync** card backs it up to a
+**private (secret) GitHub Gist**:
+
+1. Create a token at
+   [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=gist&description=Spanish%20Practice%20sync)
+   — a **classic** token with only the **`gist`** scope.
+2. Paste it into the sync card and click **Connect**. The app finds (or creates)
+   a secret Gist named `spanish-practice-words.json` and uploads your words.
+3. On another device, open the app and paste the **same token** — your words
+   are discovered and loaded automatically. No Gist ID to copy around.
+
+Notes:
+- The token is stored only in that browser's local storage. You can **Disconnect**
+  anytime, or revoke the token on GitHub.
+- Changes save to the Gist automatically (debounced); the pill in the top-right
+  shows **Synced ✓ / Saving… / Sync error**.
+- On load, the Gist is treated as the source of truth, so deletions propagate
+  between devices. The first time you connect a device that already has words,
+  they're merged into the Gist (keeping the best progress) so nothing is lost.
+- A secret Gist is unlisted and not searchable, but anyone with its URL can view
+  it — it is not truly private. Don't store anything sensitive.
+
 ## Files
 
 | File | Purpose |

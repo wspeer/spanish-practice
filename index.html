@@ -8,6 +8,7 @@
 </head>
 <body>
   <header>
+    <div class="sync-pill idle" id="sync-pill" title="Sync status">Local only</div>
     <h1>🇪🇸 Spanish Vocabulary Practice</h1>
     <nav class="tabs">
       <button class="tab active" data-tab="practice">Practice</button>
@@ -125,6 +126,40 @@
           <button id="export-btn" class="secondary">Export backup (JSON)</button>
           <button id="import-btn" class="secondary">Import backup</button>
           <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+
+      <div class="card" id="sync-card">
+        <h2>Cross-device sync</h2>
+        <p class="muted">
+          Store your word bank in a private (secret) GitHub Gist so it carries
+          across your devices. Reads happen automatically; saving uses a token
+          stored only in this browser.
+        </p>
+
+        <div id="sync-disconnected">
+          <div class="field">
+            <label for="sync-token">GitHub token</label>
+            <input id="sync-token" type="password" autocomplete="off"
+                   spellcheck="false" placeholder="ghp_…" />
+          </div>
+          <button id="sync-connect" class="primary">Connect</button>
+          <p class="hint muted">
+            Create one at
+            <a href="https://github.com/settings/tokens/new?scopes=gist&description=Spanish%20Practice%20sync"
+               target="_blank" rel="noopener">github.com/settings/tokens</a>
+            (classic) with only the <code>gist</code> scope. On a new device,
+            paste the same token and your words appear automatically.
+          </p>
+        </div>
+
+        <div id="sync-connected" class="hidden">
+          <p id="sync-state-text"></p>
+          <p class="hint muted" id="sync-gist-link"></p>
+          <div class="bank-actions">
+            <button id="sync-now" class="secondary">Sync now</button>
+            <button id="sync-disconnect" class="secondary">Disconnect</button>
+          </div>
         </div>
       </div>
     </section>

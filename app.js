@@ -33,6 +33,21 @@
   // load() here would hit those `const` helpers in their temporal dead zone.
   let words = [];
 
+  /* Cross-device sync via a secret GitHub Gist. Config persists locally;
+     state object is declared up here (before any code that reads it) to
+     avoid the temporal-dead-zone pitfall fixed above. */
+  const SYNC_TOKEN_KEY = "spanish-practice.sync.token";
+  const SYNC_GIST_KEY = "spanish-practice.sync.gistId";
+  const GIST_FILENAME = "spanish-practice-words.json";
+  const sync = {
+    token: localStorage.getItem(SYNC_TOKEN_KEY) || "",
+    gistId: localStorage.getItem(SYNC_GIST_KEY) || "",
+    state: "idle", // idle | offline | connecting | synced | saving | error
+    dirty: false,
+    timer: null,
+    lastError: "",
+  };
+
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -58,13 +73,20 @@
     };
   }
 
-  function save() {
+  function saveLocal() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
     } catch (e) {
       console.error("Failed to save words:", e);
       alert("Could not save to local storage. Your changes may be lost.");
     }
+  }
+
+  /* Persist locally, and (when sync is configured) push to the Gist. The
+     remote push is debounced so rapid practice answers don't spam the API. */
+  function save() {
+    saveLocal();
+    if (sync.token && sync.gistId) scheduleRemoteSync();
   }
 
   /* ---------------- Helpers ---------------- */
@@ -346,6 +368,246 @@
     reader.readAsText(file);
     e.target.value = "";
   });
+
+  /* ============================================================
+     CROSS-DEVICE SYNC  (secret GitHub Gist)
+     ============================================================ */
+  const GITHUB_API = "https://api.github.com";
+
+  function syncConfigured() { return !!(sync.token && sync.gistId); }
+
+  function setSyncState(state, errMsg = "") {
+    sync.state = state;
+    sync.lastError = errMsg;
+    const pillLabels = {
+      idle: "Local only", offline: "Local only", connecting: "Syncing…",
+      synced: "Synced ✓", saving: "Saving…", error: "Sync error",
+    };
+    const pill = $("#sync-pill");
+    if (pill) {
+      pill.textContent = pillLabels[state] || state;
+      pill.className = "sync-pill " + state;
+      pill.title = errMsg || pillLabels[state] || "";
+    }
+    renderSyncPanel();
+  }
+
+  function renderSyncPanel() {
+    const disc = $("#sync-disconnected");
+    const conn = $("#sync-connected");
+    if (!disc || !conn) return;
+    const connected = !!sync.token;
+    disc.classList.toggle("hidden", connected);
+    conn.classList.toggle("hidden", !connected);
+
+    const stateText = $("#sync-state-text");
+    if (stateText) {
+      const map = {
+        connecting: "Connecting to your Gist…",
+        synced: "Synced — your words are backed up and will load on any device with this token.",
+        saving: "Saving changes…",
+        error: "Error: " + (sync.lastError || "something went wrong."),
+        offline: "Connected. Changes will sync as you make them.",
+        idle: "Connected.",
+      };
+      stateText.textContent = map[sync.state] || sync.state;
+      stateText.className = sync.state === "error" ? "bad-txt" : "muted";
+    }
+    const link = $("#sync-gist-link");
+    if (link) {
+      link.innerHTML = sync.gistId
+        ? `Backed up to secret Gist <a href="https://gist.github.com/${sync.gistId}" target="_blank" rel="noopener">${sync.gistId.slice(0, 8)}…</a>`
+        : "";
+    }
+  }
+
+  async function ghFetch(path, options = {}) {
+    const res = await fetch(GITHUB_API + path, {
+      ...options,
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": "Bearer " + sync.token,
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      let detail = "";
+      try { detail = (await res.json()).message || ""; } catch (_) { /* ignore */ }
+      if (res.status === 401) detail = "Invalid token — make sure it's a classic token with the 'gist' scope.";
+      throw new Error(`${res.status} ${detail}`.trim());
+    }
+    return res.status === 204 ? null : res.json();
+  }
+
+  // Find an existing sync Gist by its filename (so a new device only needs the token).
+  async function findGistId() {
+    for (let page = 1; page <= 5; page++) {
+      const gists = await ghFetch(`/gists?per_page=100&page=${page}`);
+      if (!gists.length) break;
+      const hit = gists.find((g) => g.files && g.files[GIST_FILENAME]);
+      if (hit) return hit.id;
+      if (gists.length < 100) break;
+    }
+    return null;
+  }
+
+  async function createGist(arr) {
+    const g = await ghFetch("/gists", {
+      method: "POST",
+      body: JSON.stringify({
+        description: "Spanish Vocabulary Practice — word bank (synced)",
+        public: false,
+        files: { [GIST_FILENAME]: { content: JSON.stringify(arr, null, 2) } },
+      }),
+    });
+    return g.id;
+  }
+
+  async function readGist(id) {
+    const g = await ghFetch(`/gists/${id}`);
+    const file = g.files && g.files[GIST_FILENAME];
+    if (!file) return [];
+    let content = file.content;
+    if (file.truncated && file.raw_url) {
+      content = await fetch(file.raw_url).then((r) => r.text());
+    }
+    try { return JSON.parse(content || "[]"); } catch (_) { return []; }
+  }
+
+  async function writeGist(id, arr, keepalive = false) {
+    await ghFetch(`/gists/${id}`, {
+      method: "PATCH",
+      keepalive,
+      body: JSON.stringify({
+        files: { [GIST_FILENAME]: { content: JSON.stringify(arr, null, 2) } },
+      }),
+    });
+  }
+
+  /* Union two word lists by Spanish word, keeping the strongest progress. */
+  function mergeWordLists(base, extra) {
+    const out = base.map(normalizeWord);
+    const byEs = new Map(out.map((w) => [norm(w.spanish), w]));
+    extra.forEach((raw) => {
+      const w = normalizeWord(raw);
+      const hit = byEs.get(norm(w.spanish));
+      if (hit) {
+        hit.level = Math.max(hit.level, w.level);
+        hit.seen = Math.max(hit.seen, w.seen);
+        hit.correct = Math.max(hit.correct, w.correct);
+        if (!hit.english) hit.english = w.english;
+      } else {
+        out.push(w);
+        byEs.set(norm(w.spanish), w);
+      }
+    });
+    return out;
+  }
+
+  function renderAll() {
+    renderWordList();
+    updateSetupSummary();
+    if ($("#stats").classList.contains("active")) renderStats();
+  }
+
+  /* Connect: discover or create the Gist, then reconcile local & cloud data. */
+  async function connectSync() {
+    if (!sync.token) { setSyncState("offline"); return; }
+    setSyncState("connecting");
+    try {
+      const firstConnect = !sync.gistId;
+      if (!sync.gistId) sync.gistId = await findGistId();
+
+      if (!sync.gistId) {
+        // None exists yet — create one seeded from this device's words.
+        sync.gistId = await createGist(words);
+        localStorage.setItem(SYNC_GIST_KEY, sync.gistId);
+        renderAll();
+        setSyncState("synced");
+        return;
+      }
+      localStorage.setItem(SYNC_GIST_KEY, sync.gistId);
+
+      const remote = await readGist(sync.gistId);
+      if (firstConnect && words.length) {
+        // First time connecting on a device that already has words: merge so
+        // nothing entered before sync was set up gets lost.
+        words = mergeWordLists(remote, words);
+        saveLocal();
+        await writeGist(sync.gistId, words);
+      } else {
+        // Normal load: the Gist is the source of truth (deletions propagate).
+        words = remote.map(normalizeWord);
+        saveLocal();
+      }
+      renderAll();
+      setSyncState("synced");
+    } catch (e) {
+      console.error("Sync connect failed:", e);
+      setSyncState("error", e.message);
+    }
+  }
+
+  function scheduleRemoteSync() {
+    sync.dirty = true;
+    setSyncState("saving");
+    clearTimeout(sync.timer);
+    sync.timer = setTimeout(() => flushRemoteSync(), 1500);
+  }
+
+  async function flushRemoteSync(opts = {}) {
+    if (!syncConfigured() || !sync.dirty) return;
+    sync.dirty = false;
+    try {
+      await writeGist(sync.gistId, words, !!opts.keepalive);
+      setSyncState("synced");
+    } catch (e) {
+      sync.dirty = true; // keep trying on the next change
+      console.error("Sync save failed:", e);
+      setSyncState("error", e.message);
+    }
+  }
+
+  function disconnectSync() {
+    clearTimeout(sync.timer);
+    sync.token = "";
+    sync.gistId = "";
+    sync.dirty = false;
+    localStorage.removeItem(SYNC_TOKEN_KEY);
+    localStorage.removeItem(SYNC_GIST_KEY);
+    setSyncState("offline");
+  }
+
+  // Wire up the sync UI controls.
+  $("#sync-connect").addEventListener("click", async () => {
+    const token = $("#sync-token").value.trim();
+    if (!token) return;
+    sync.token = token;
+    localStorage.setItem(SYNC_TOKEN_KEY, token);
+    $("#sync-token").value = "";
+    await connectSync();
+  });
+  $("#sync-token").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("#sync-connect").click(); }
+  });
+  $("#sync-disconnect").addEventListener("click", () => {
+    if (confirm("Disconnect sync on this device? Your words stay here — they just won't sync until you reconnect.")) {
+      disconnectSync();
+    }
+  });
+  $("#sync-now").addEventListener("click", async () => {
+    if (!syncConfigured()) return;
+    await flushRemoteSync();   // push any pending local changes first
+    await connectSync();       // then pull the latest from the Gist
+  });
+
+  // Best-effort flush of unsaved changes when the page is hidden/closed.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushRemoteSync({ keepalive: true });
+  });
+  window.addEventListener("pagehide", () => flushRemoteSync({ keepalive: true }));
 
   /* ============================================================
      PRACTICE SETUP
@@ -668,4 +930,9 @@
   words = load();
   renderWordList();
   updateSetupSummary();
+
+  // Bring up sync last: render instantly from local data, then reconcile
+  // with the Gist in the background if a token is configured.
+  if (sync.token) connectSync();
+  else setSyncState("offline");
 })();
