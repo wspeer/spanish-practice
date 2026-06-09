@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - claude/inspiring-curie-sbe3q0
   workflow_dispatch:
 
 # Allow the workflow to publish to Pages.
