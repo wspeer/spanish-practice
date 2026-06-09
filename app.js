@@ -26,8 +26,6 @@
 
   const QUESTIONS_PER_SESSION = 12;
   const MC_OPTION_COUNT = 5;
-  // Free-response auto-advances this long after a correct answer (ms).
-  const AUTO_ADVANCE_MS = 900;
 
   /* ---------------- State ---------------- */
   // Populated in the INIT section below, once all helpers (uid, clamp, …)
@@ -699,14 +697,12 @@
       missed: [],   // words answered incorrectly
       current: null,
       answered: false,
-      advanceTimer: null,
     };
     showPracticeScreen("active");
     nextQuestion();
   }
 
   function nextQuestion() {
-    clearTimeout(session.advanceTimer);
     if (session.asked >= session.total) { finishSession(); return; }
     session.asked += 1;
     session.answered = false;
@@ -835,15 +831,6 @@
     const nextBtn = $("#next-btn");
     nextBtn.textContent = session.asked >= session.total ? "See results →" : "Next →";
     setTimeout(() => nextBtn.focus(), 0);
-
-    // Free response flows on its own after a correct answer; wrong/accent
-    // answers stay up so you can read the correct spelling. (Multiple choice
-    // always waits for a manual Next.)
-    if (session.mode === "fr" && correct) {
-      session.advanceTimer = setTimeout(() => {
-        if (session && session.answered) nextQuestion();
-      }, AUTO_ADVANCE_MS);
-    }
   }
 
   $("#next-btn").addEventListener("click", () => nextQuestion());
@@ -870,7 +857,6 @@
   });
 
   function finishSession() {
-    clearTimeout(session.advanceTimer);
     const fb = $("#feedback");
     fb.classList.add("hidden");
     const total = session.asked - (session.answered ? 0 : 1);
