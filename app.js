@@ -28,7 +28,10 @@
   const MC_OPTION_COUNT = 5;
 
   /* ---------------- State ---------------- */
-  let words = load();
+  // Populated in the INIT section below, once all helpers (uid, clamp, …)
+  // that load()/normalizeWord() depend on have been initialized. Calling
+  // load() here would hit those `const` helpers in their temporal dead zone.
+  let words = [];
 
   function load() {
     try {
@@ -662,6 +665,7 @@
   /* ============================================================
      INIT
      ============================================================ */
+  words = load();
   renderWordList();
   updateSetupSummary();
 })();
