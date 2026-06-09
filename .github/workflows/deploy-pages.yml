@@ -6,6 +6,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
+      - main
       - claude/inspiring-curie-sbe3q0
   workflow_dispatch:
 
