@@ -799,9 +799,8 @@
   }
 
   $("#fr-submit").addEventListener("click", submitFR);
-  frInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); submitFR(); }
-  });
+  // Enter handling for free response lives in the global keydown handler below,
+  // so a single Enter press can't both submit and advance past the feedback.
 
   /* ---------------- Shared answer handling ---------------- */
   function finishAnswer(correct, correctAnswer, special) {
@@ -830,7 +829,9 @@
 
     const nextBtn = $("#next-btn");
     nextBtn.textContent = session.asked >= session.total ? "See results →" : "Next →";
-    setTimeout(() => nextBtn.focus(), 0);
+    // Note: we deliberately don't focus the Next button — Enter-to-advance is
+    // handled by the global keydown listener, and focusing it could let one
+    // Enter press both fire the button click and the listener (double-advance).
   }
 
   $("#next-btn").addEventListener("click", () => nextQuestion());
@@ -840,19 +841,28 @@
     if ($("#practice-active").classList.contains("hidden")) return;
     if (!session) return;
 
-    // Advance with Enter when feedback is showing.
-    if (session.answered && (e.key === "Enter")) {
-      e.preventDefault();
-      nextQuestion();
+    if (!session.answered) {
+      // Enter submits a free-response answer (shows feedback, does NOT advance).
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (session.mode === "fr") submitFR();
+        return;
+      }
+      // Multiple-choice number keys 1-5 select an option.
+      if (session.mode === "mc") {
+        const idx = parseInt(e.key, 10);
+        if (idx >= 1 && idx <= MC_OPTION_COUNT) {
+          const btn = $$("#mc-options .mc-option")[idx - 1];
+          if (btn) { e.preventDefault(); btn.click(); }
+        }
+      }
       return;
     }
-    // Multiple-choice number keys 1-5 select an option.
-    if (session.mode === "mc" && !session.answered) {
-      const idx = parseInt(e.key, 10);
-      if (idx >= 1 && idx <= MC_OPTION_COUNT) {
-        const btn = $$("#mc-options .mc-option")[idx - 1];
-        if (btn) { e.preventDefault(); btn.click(); }
-      }
+
+    // Feedback is showing: a fresh Enter press advances to the next question.
+    if (e.key === "Enter") {
+      e.preventDefault();
+      nextQuestion();
     }
   });
 
