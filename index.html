@@ -121,6 +121,14 @@
           <h2>Your words (<span id="word-count">0</span>)</h2>
           <input id="search" type="search" placeholder="Search…" />
         </div>
+        <div class="list-controls" id="list-controls">
+          <span class="lc-label">Sort:</span>
+          <div class="seg">
+            <button class="seg-btn active" data-sort="alpha">A–Z</button>
+            <button class="seg-btn" data-sort="level">By mastery</button>
+          </div>
+          <button class="chip-toggle" id="verbs-only" aria-pressed="false">Verbs only</button>
+        </div>
         <div id="word-list" class="word-list"></div>
         <div class="bank-actions">
           <button id="export-btn" class="secondary">Export backup (JSON)</button>

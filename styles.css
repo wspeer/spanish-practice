@@ -280,6 +280,32 @@ input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px r
 .bank-header h2 { margin: 0; }
 .bank-header input { max-width: 220px; }
 
+/* ---------- Word-bank list controls ---------- */
+.list-controls {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.lc-label { font-size: .85rem; color: var(--muted); font-weight: 600; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg-btn {
+  background: var(--card); border: none; cursor: pointer;
+  padding: 7px 14px; font-size: .88rem; font-weight: 600; color: var(--muted);
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--line); }
+.seg-btn:hover { background: var(--bg); color: var(--ink); }
+.seg-btn.active { background: var(--brand); color: #fff; }
+
+.chip-toggle {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 14px; font-size: .88rem; font-weight: 600; color: var(--muted);
+  cursor: pointer; margin-left: auto;
+}
+.chip-toggle:hover { border-color: var(--muted); color: var(--ink); }
+.chip-toggle.active {
+  background: #fff6f5; border-color: var(--brand); color: var(--brand);
+}
+
 .word-list { display: flex; flex-direction: column; }
 .word-row {
   display: flex; align-items: center; gap: 12px;

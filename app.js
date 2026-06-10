@@ -240,6 +240,39 @@
 
   searchInput.addEventListener("input", renderWordList);
 
+  /* Word-bank list controls: default alphabetical, with one-click sort-by-mastery
+     and a verbs-only filter. State is in-memory (resets to A–Z on reload). */
+  let bankSort = "alpha";   // "alpha" | "level"
+  let bankVerbsOnly = false;
+
+  // Sort key: the Spanish word minus a leading article, so "el perro" files
+  // under P, not E (dictionary-style ordering).
+  function bankSortKey(w) {
+    return norm(w.spanish).replace(/^(el|la|los|las|un|una|unos|unas)\s+/, "");
+  }
+
+  // Heuristic verb test: any English meaning that starts with "to ", or any
+  // Spanish variant that looks like an infinitive (ends in -ar/-er/-ir).
+  function isVerb(w) {
+    if (w.english.split(/[/,]/).some((s) => /^\s*to\s/i.test(s))) return true;
+    return w.spanish.split(/[/,]/).some((s) => /(ar|er|ir)$/.test(norm(s)));
+  }
+
+  $$("#list-controls [data-sort]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      bankSort = btn.dataset.sort;
+      $$("#list-controls [data-sort]").forEach((b) =>
+        b.classList.toggle("active", b === btn));
+      renderWordList();
+    });
+  });
+  $("#verbs-only").addEventListener("click", () => {
+    bankVerbsOnly = !bankVerbsOnly;
+    $("#verbs-only").classList.toggle("active", bankVerbsOnly);
+    $("#verbs-only").setAttribute("aria-pressed", String(bankVerbsOnly));
+    renderWordList();
+  });
+
   function renderWordList() {
     const list = $("#word-list");
     const q = norm(searchInput.value);
@@ -251,11 +284,16 @@
     }
 
     const filtered = words
+      .filter((w) => !bankVerbsOnly || isVerb(w))
       .filter((w) => !q || norm(w.spanish).includes(q) || norm(w.english).includes(q))
-      .sort((a, b) => a.level - b.level || a.spanish.localeCompare(b.spanish));
+      .sort((a, b) =>
+        bankSort === "level"
+          ? a.level - b.level || bankSortKey(a).localeCompare(bankSortKey(b), "es")
+          : bankSortKey(a).localeCompare(bankSortKey(b), "es"));
 
     if (!filtered.length) {
-      list.innerHTML = `<p class="empty">No words match “${escapeHtml(searchInput.value)}”.</p>`;
+      const reason = bankVerbsOnly && !q ? "No verbs found." : `No words match “${escapeHtml(searchInput.value)}”.`;
+      list.innerHTML = `<p class="empty">${reason}</p>`;
       return;
     }
 
