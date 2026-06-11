@@ -900,6 +900,12 @@
     if (!session) return;
 
     if (!session.answered) {
+      // Esc gives up on a free-response question (reveal answer, mark wrong).
+      if (session.mode === "fr" && e.key === "Escape") {
+        e.preventDefault();
+        giveUpFR();
+        return;
+      }
       // Enter submits a free-response answer (shows feedback, does NOT advance).
       if (e.key === "Enter") {
         e.preventDefault();
