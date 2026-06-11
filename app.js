@@ -815,6 +815,7 @@
     frInput.value = "";
     frInput.disabled = false;
     $("#fr-submit").disabled = false;
+    $("#fr-giveup").disabled = false;
     setTimeout(() => frInput.focus(), 0);
   }
 
@@ -829,14 +830,28 @@
     const accentOnly = !exact && accepted.some((a) => stripAccents(a) === stripAccents(user));
 
     session.answered = true;
-    frInput.disabled = true;
-    $("#fr-submit").disabled = true;
-
+    lockFR();
     // An accent-only mistake counts as incorrect but gets a gentler message.
     finishAnswer(exact, w.spanish, accentOnly && !exact ? "accent" : null);
   }
 
+  // "I don't know": reveal the answer and count it as incorrect (so the word
+  // drops a level and comes back for review).
+  function giveUpFR() {
+    if (session.answered) return;
+    session.answered = true;
+    lockFR();
+    finishAnswer(false, session.current.spanish, "giveup");
+  }
+
+  function lockFR() {
+    frInput.disabled = true;
+    $("#fr-submit").disabled = true;
+    $("#fr-giveup").disabled = true;
+  }
+
   $("#fr-submit").addEventListener("click", submitFR);
+  $("#fr-giveup").addEventListener("click", giveUpFR);
   // Enter handling for free response lives in the global keydown handler below,
   // so a single Enter press can't both submit and advance past the feedback.
 
@@ -858,6 +873,11 @@
       fbText.innerHTML =
         `<span class="big-verdict warn-txt">So close — check the accents.</span>` +
         `<div>Correct spelling: <span class="answer">${escapeHtml(correctAnswer)}</span></div>`;
+    } else if (special === "giveup") {
+      fb.classList.add("bad");
+      fbText.innerHTML =
+        `<span class="big-verdict bad-txt">No worries — here it is:</span>` +
+        `<div>Answer: <span class="answer">${escapeHtml(correctAnswer)}</span></div>`;
     } else {
       fb.classList.add("bad");
       fbText.innerHTML =

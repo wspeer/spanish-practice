@@ -225,6 +225,10 @@ input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px r
 .fr-area { display: flex; flex-direction: column; gap: 12px; }
 #fr-input { font-size: 1.2rem; text-align: center; }
 
+.fr-buttons { display: flex; gap: 10px; }
+.fr-buttons #fr-submit { flex: 1 1 auto; }
+.fr-buttons #fr-giveup { flex: 0 0 auto; }
+
 .accent-keys { display: flex; gap: 6px; flex-wrap: wrap; }
 .accent-key {
   background: var(--bg);
