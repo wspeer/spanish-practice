@@ -27,6 +27,10 @@
   const QUESTIONS_PER_SESSION = 12;
   const MC_OPTION_COUNT = 5;
 
+  /* Part of speech, used to group multiple-choice options by category. */
+  const POS_VALUES = ["noun", "verb", "adj", "other"];
+  const POS_LABELS = { noun: "Noun", verb: "Verb", adj: "Adj.", other: "Other" };
+
   /* ---------------- State ---------------- */
   // Populated in the INIT section below, once all helpers (uid, clamp, …)
   // that load()/normalizeWord() depend on have been initialized. Calling
@@ -61,7 +65,7 @@
   }
 
   function normalizeWord(w) {
-    return {
+    const word = {
       id: w.id || uid(),
       spanish: String(w.spanish || "").trim(),
       english: String(w.english || "").trim(),
@@ -70,7 +74,12 @@
       correct: Number(w.correct) || 0,
       created: w.created || Date.now(),
       lastPracticed: w.lastPracticed || null,
+      pos: "other",
     };
+    // Use a stored part of speech if present; otherwise guess (so existing
+    // words are classified automatically and can be corrected via Edit).
+    word.pos = POS_VALUES.includes(w.pos) ? w.pos : guessPos(word);
+    return word;
   }
 
   function saveLocal() {
@@ -202,23 +211,40 @@
   buildAccentKeys($("#add-accent-keys"), addSpanish);
   enableAccentDigits(addSpanish);
 
+  const addPos = $("#add-pos");
+
+  // Pre-fill the part-of-speech selector with a smart guess as the user types,
+  // unless they've manually chosen one.
+  let posTouched = false;
+  function refreshPosGuess() {
+    if (posTouched) return;
+    addPos.value = guessPos({ spanish: addSpanish.value, english: addEnglish.value });
+  }
+  addSpanish.addEventListener("input", refreshPosGuess);
+  addEnglish.addEventListener("input", refreshPosGuess);
+  addPos.addEventListener("change", () => { posTouched = true; });
+
   addForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const spanish = addSpanish.value.trim();
     const english = addEnglish.value.trim();
+    const pos = addPos.value;
     if (!spanish || !english) return;
 
     // Merge if the Spanish word already exists.
     const existing = words.find((w) => norm(w.spanish) === norm(spanish));
     if (existing) {
       existing.english = english;
+      existing.pos = pos;
       flash(`Updated “${spanish}”.`);
     } else {
-      words.push(normalizeWord({ spanish, english }));
+      words.push(normalizeWord({ spanish, english, pos }));
       flash(`Added “${spanish}”.`);
     }
     save();
     addForm.reset();
+    posTouched = false;
+    refreshPosGuess();
     addSpanish.focus();
     renderWordList();
     updateSetupSummary();
@@ -256,6 +282,15 @@
   function isVerb(w) {
     if (w.english.split(/[/,]/).some((s) => /^\s*to\s/i.test(s))) return true;
     return w.spanish.split(/[/,]/).some((s) => /(ar|er|ir)$/.test(norm(s)));
+  }
+
+  // Best-effort part-of-speech guess (adjectives can't be detected reliably,
+  // so they fall through to "other" until tagged explicitly).
+  function guessPos(w) {
+    if (isVerb(w)) return "verb";
+    if (/^(el|la|los|las|un|una|unos|unas)\s/.test(norm(w.spanish)) ||
+        /^the\s/.test(norm(w.english))) return "noun";
+    return "other";
   }
 
   $$("#list-controls [data-sort]").forEach((btn) => {
@@ -317,6 +352,7 @@
           <div class="word-en">${escapeHtml(w.english)}</div>
         </div>
         <div class="word-meta">
+          <span class="pos-tag" title="Part of speech">${POS_LABELS[w.pos] || "Other"}</span>
           <span class="level-pips" title="Level ${w.level}/${MAX_LEVEL}">${pips}</span>
           ${badge}
           <button class="icon-btn" data-act="edit" title="Edit">✎</button>
@@ -336,8 +372,12 @@
     if (newEs === null) return;
     const newEn = prompt("English:", w.english);
     if (newEn === null) return;
+    const newPos = prompt("Part of speech — noun, verb, adj, or other:", w.pos);
+    if (newPos === null) return;
     w.spanish = newEs.trim() || w.spanish;
     w.english = newEn.trim() || w.english;
+    const p = newPos.trim().toLowerCase();
+    if (POS_VALUES.includes(p)) w.pos = p;
     save();
     renderWordList();
   }
@@ -761,11 +801,16 @@
     $("#mc-options").classList.remove("hidden");
     $("#fr-area").classList.add("hidden");
 
-    // Build distractor options from other words' English meanings.
+    // Build distractor options from other words' English meanings, drawn from
+    // the SAME part of speech as the prompt word (verbs with verbs, etc.).
+    // If no same-category words exist, fall back to any so the question still
+    // offers choices rather than a single option.
     const others = shuffle(words.filter((x) => x.id !== w.id && norm(x.english) !== norm(w.english)));
+    const samePos = others.filter((o) => o.pos === w.pos);
+    const pool = samePos.length ? samePos : others;
     const distractors = [];
     const usedMeanings = new Set([norm(w.english)]);
-    for (const o of others) {
+    for (const o of pool) {
       if (usedMeanings.has(norm(o.english))) continue;
       usedMeanings.add(norm(o.english));
       distractors.push(o.english);

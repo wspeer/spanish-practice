@@ -114,6 +114,15 @@
             <input id="add-english" type="text" autocomplete="off"
                    placeholder="e.g. the dog" required />
           </div>
+          <div class="field">
+            <label for="add-pos">Part of speech</label>
+            <select id="add-pos">
+              <option value="noun">Noun</option>
+              <option value="verb">Verb</option>
+              <option value="adj">Adjective</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
           <button type="submit" class="primary">Add word</button>
           <p class="hint muted">Tip: separate synonyms with a slash, e.g. <code>quick / fast</code>.</p>
         </form>

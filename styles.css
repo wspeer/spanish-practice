@@ -151,7 +151,7 @@ button { font-family: inherit; }
   margin-bottom: 7px;
 }
 
-input[type="text"], input[type="search"], input[type="file"] {
+input[type="text"], input[type="search"], input[type="file"], select {
   width: 100%;
   padding: 11px 13px;
   border: 1px solid var(--line);
@@ -160,7 +160,8 @@ input[type="text"], input[type="search"], input[type="file"] {
   background: #fff;
   color: var(--ink);
 }
-input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(192,57,43,.12); }
+select { cursor: pointer; }
+input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(192,57,43,.12); }
 
 /* ---------- Choice cards (mode / scope) ---------- */
 .choice-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -326,6 +327,13 @@ kbd {
 .word-es { font-weight: 600; }
 .word-en { color: var(--muted); font-size: .92rem; }
 .word-meta { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+
+.pos-tag {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--line);
+  padding: 2px 7px; border-radius: 20px;
+}
 
 .level-pips { display: flex; gap: 3px; }
 .pip { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
