@@ -28,7 +28,10 @@ That's it. Your word bank is saved automatically in the browser's local storage.
 Choose a **question type** and **which words** to drill, then *Start*:
 
 - **Multiple choice** — see a Spanish word, pick the English meaning from five
-  options. Keys **1–5** select an option.
+  options. Keys **1–5** select an option. Options mix same-part-of-speech words
+  from your bank with a couple of similar-meaning words (fetched from the free
+  [Datamuse](https://www.datamuse.com/api/) API) to force precise recall; if
+  that request is unavailable it falls back to bank words only.
 - **Free response** — see an English word, type the Spanish. Keys **1–6** insert
   accented letters. Getting only an accent wrong gives a gentle "check the
   accents" nudge.

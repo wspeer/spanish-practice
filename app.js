@@ -809,31 +809,103 @@
   }
 
   /* ---------------- Multiple choice (ES -> EN) ---------------- */
-  function renderMC() {
+  // Similar-meaning distractors come from Datamuse (free, no API key, CORS-OK).
+  const DATAMUSE_URL = "https://api.datamuse.com/words";
+  const POS_TO_DM = { noun: "n", verb: "v", adj: "adj" };
+  const simWordCache = new Map();   // query term -> [{word, tags}]
+  let datamuseDown = false;         // stop trying after a network failure
+
+  // Reduce an English meaning to a query term: first variant, no leading
+  // article or infinitive marker.
+  function primaryTerm(english) {
+    return (english.split(/[/,]/)[0] || "")
+      .trim().toLowerCase()
+      .replace(/^(to|the|a|an)\s+/, "")
+      .trim();
+  }
+
+  // Fetch similar-meaning words. Returns [] on any failure so MC still works.
+  async function fetchSimilarWords(english) {
+    if (datamuseDown) return [];
+    const term = primaryTerm(english);
+    if (!term) return [];
+    if (simWordCache.has(term)) return simWordCache.get(term);
+    let out = [];
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1200);
+      const res = await fetch(
+        `${DATAMUSE_URL}?max=30&md=p&ml=${encodeURIComponent(term)}`,
+        { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        out = data
+          .filter((d) => d.word && /^[a-z][a-z '-]*$/i.test(d.word))
+          .map((d) => ({ word: d.word, tags: d.tags || [] }));
+      }
+    } catch (_) {
+      datamuseDown = true;   // offline/blocked — don't stall on later questions
+    }
+    simWordCache.set(term, out);
+    return out;
+  }
+
+  async function renderMC() {
     const w = session.current;
     $("#prompt-label").textContent = "What does this mean?";
     $("#prompt-word").textContent = w.spanish;
     $("#mc-options").classList.remove("hidden");
     $("#fr-area").classList.add("hidden");
+    const box = $("#mc-options");
+    box.innerHTML = `<p class="muted mc-loading">Loading options…</p>`;
 
-    // Build distractor options from other words' English meanings, drawn from
-    // the SAME part of speech as the prompt word (verbs with verbs, etc.).
-    // If no same-category words exist, fall back to any so the question still
-    // offers choices rather than a single option.
+    // Bank distractors, same part of speech as the prompt (fallback: any word).
     const others = shuffle(words.filter((x) => x.id !== w.id && norm(x.english) !== norm(w.english)));
     const samePos = others.filter((o) => o.pos === w.pos);
-    const pool = samePos.length ? samePos : others;
-    const distractors = [];
-    const usedMeanings = new Set([norm(w.english)]);
-    for (const o of pool) {
-      if (usedMeanings.has(norm(o.english))) continue;
-      usedMeanings.add(norm(o.english));
-      distractors.push(o.english);
-      if (distractors.length >= MC_OPTION_COUNT - 1) break;
-    }
-    const options = shuffle([w.english, ...distractors]);
+    const bankPool = (samePos.length ? samePos : others).map((o) => o.english);
 
-    const box = $("#mc-options");
+    // Similar-meaning words from OUTSIDE the bank, to force precision.
+    const sim = await fetchSimilarWords(w.english);
+    // Bail if the user advanced or the session ended while we were fetching.
+    if (!session || session.current !== w || session.answered) return;
+
+    const bankMeanings = new Set(words.map((x) => norm(x.english)));
+    const wantTag = POS_TO_DM[w.pos];
+    const simOutside = sim.filter((s) => !bankMeanings.has(norm(s.word)));
+    const simMatch = wantTag ? simOutside.filter((s) => s.tags.includes(wantTag)) : simOutside;
+    const simRest = simOutside.filter((s) => !simMatch.includes(s));
+
+    const target = MC_OPTION_COUNT - 1;
+    // Seed with every accepted variant so a true synonym never shows as "wrong".
+    const used = new Set(variants(w.english));
+    const distractors = [];
+    const tryAdd = (text) => {
+      const n = norm(text);
+      if (!n || used.has(n)) return false;
+      used.add(n);
+      distractors.push(text);
+      return true;
+    };
+
+    // ~2 similar words first (the precision traps)…
+    let simAdded = 0;
+    for (const s of simMatch) {
+      if (simAdded >= 2 || distractors.length >= target) break;
+      if (tryAdd(s.word)) simAdded++;
+    }
+    // …then fill from the bank (same part of speech)…
+    for (const m of bankPool) {
+      if (distractors.length >= target) break;
+      tryAdd(m);
+    }
+    // …and top up with any remaining similar words if still short.
+    for (const s of [...simMatch, ...simRest]) {
+      if (distractors.length >= target) break;
+      tryAdd(s.word);
+    }
+
+    const options = shuffle([w.english, ...distractors]);
     box.innerHTML = "";
     options.forEach((opt, i) => {
       const btn = document.createElement("button");
