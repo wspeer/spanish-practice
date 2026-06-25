@@ -231,9 +231,24 @@
     const pos = addPos.value;
     if (!spanish || !english) return;
 
-    // Merge if the Spanish word already exists.
+    // Flag a duplicate Spanish word and confirm before changing its meaning.
     const existing = words.find((w) => norm(w.spanish) === norm(spanish));
     if (existing) {
+      const sameMeaning = norm(existing.english) === norm(english) && existing.pos === pos;
+      if (sameMeaning) {
+        flash(`“${spanish}” is already in your word bank — nothing to change.`);
+        addSpanish.focus();
+        addSpanish.select();
+        return;
+      }
+      const ok = confirm(
+        `“${spanish}” is already in your word bank, meaning “${existing.english}”.\n\n` +
+        `Change its meaning to “${english}”?`);
+      if (!ok) {
+        // Leave the form as typed so a mistaken entry can be corrected.
+        flash(`Kept the existing meaning of “${spanish}”.`);
+        return;
+      }
       existing.english = english;
       existing.pos = pos;
       flash(`Updated “${spanish}”.`);
