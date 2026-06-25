@@ -824,6 +824,13 @@
       .trim();
   }
 
+  // Canonical meaning key for dedup: ignores case, accents, spaces, hyphens,
+  // apostrophes and periods — so "dining room" / "diningroom" / "dining-room"
+  // are all treated as the same meaning and never appear as separate options.
+  function canonMeaning(s) {
+    return stripAccents(norm(s)).replace(/[\s'’.\-]/g, "");
+  }
+
   // Fetch similar-meaning words. Returns [] on any failure so MC still works.
   async function fetchSimilarWords(english) {
     if (datamuseDown) return [];
@@ -877,13 +884,14 @@
     const simRest = simOutside.filter((s) => !simMatch.includes(s));
 
     const target = MC_OPTION_COUNT - 1;
-    // Seed with every accepted variant so a true synonym never shows as "wrong".
-    const used = new Set(variants(w.english));
+    // Seed with the canonical form of every accepted variant, so neither the
+    // exact answer nor a spacing/hyphen variant of it can appear as a distractor.
+    const used = new Set(variants(w.english).map(canonMeaning));
     const distractors = [];
     const tryAdd = (text) => {
-      const n = norm(text);
-      if (!n || used.has(n)) return false;
-      used.add(n);
+      const c = canonMeaning(text);
+      if (!c || used.has(c)) return false;
+      used.add(c);
       distractors.push(text);
       return true;
     };
