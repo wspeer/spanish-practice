@@ -831,6 +831,16 @@
     return stripAccents(norm(s)).replace(/[\s'’.\-]/g, "");
   }
 
+  // Format an English meaning as an infinitive: prefix "to " to each variant
+  // that doesn't already have it (e.g. "put / place" → "to put / to place").
+  function toInfinitive(text) {
+    return text.split(/[/,]/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((t) => (/^to\s/i.test(t) ? t : "to " + t))
+      .join(" / ");
+  }
+
   // Fetch related-meaning candidates AND the answer's synonyms (so true
   // synonyms like "gull" for "seagull" can be excluded as distractors).
   // Returns {candidates:[{word,tags}], synonyms:Set<canon>}; empty on failure.
@@ -930,6 +940,10 @@
       tryAdd(s.word);
     }
 
+    // For a verb prompt, show every option as an infinitive ("to …") so the
+    // choices are uniform and the format doesn't hint at the answer. The raw
+    // value is kept for answer-matching; only the label is reformatted.
+    const isVerbPrompt = w.pos === "verb";
     const options = shuffle([w.english, ...distractors]);
     box.innerHTML = "";
     options.forEach((opt, i) => {
@@ -937,7 +951,8 @@
       btn.className = "mc-option";
       btn.type = "button";
       btn.dataset.value = opt;
-      btn.innerHTML = `<span class="keycap">${i + 1}</span><span>${escapeHtml(opt)}</span>`;
+      const label = isVerbPrompt ? toInfinitive(opt) : opt;
+      btn.innerHTML = `<span class="keycap">${i + 1}</span><span>${escapeHtml(label)}</span>`;
       btn.addEventListener("click", () => answerMC(btn, opt));
       box.appendChild(btn);
     });
