@@ -831,31 +831,38 @@
     return stripAccents(norm(s)).replace(/[\s'’.\-]/g, "");
   }
 
-  // Fetch similar-meaning words. Returns [] on any failure so MC still works.
-  async function fetchSimilarWords(english) {
-    if (datamuseDown) return [];
+  // Fetch related-meaning candidates AND the answer's synonyms (so true
+  // synonyms like "gull" for "seagull" can be excluded as distractors).
+  // Returns {candidates:[{word,tags}], synonyms:Set<canon>}; empty on failure.
+  async function fetchSimilar(english) {
+    const empty = { candidates: [], synonyms: new Set() };
+    if (datamuseDown) return empty;
     const term = primaryTerm(english);
-    if (!term) return [];
+    if (!term) return empty;
     if (simWordCache.has(term)) return simWordCache.get(term);
-    let out = [];
+    let result = { candidates: [], synonyms: new Set() };
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 1200);
-      const res = await fetch(
-        `${DATAMUSE_URL}?max=30&md=p&ml=${encodeURIComponent(term)}`,
-        { signal: ctrl.signal });
+      const timer = setTimeout(() => ctrl.abort(), 1500);
+      const q = encodeURIComponent(term);
+      const [mlRes, synRes] = await Promise.all([
+        fetch(`${DATAMUSE_URL}?max=30&md=p&ml=${q}`, { signal: ctrl.signal }),
+        fetch(`${DATAMUSE_URL}?max=30&rel_syn=${q}`, { signal: ctrl.signal }),
+      ]);
       clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        out = data
+      if (mlRes.ok) {
+        result.candidates = (await mlRes.json())
           .filter((d) => d.word && /^[a-z][a-z '-]*$/i.test(d.word))
           .map((d) => ({ word: d.word, tags: d.tags || [] }));
+      }
+      if (synRes.ok) {
+        result.synonyms = new Set((await synRes.json()).map((d) => canonMeaning(d.word)));
       }
     } catch (_) {
       datamuseDown = true;   // offline/blocked — don't stall on later questions
     }
-    simWordCache.set(term, out);
-    return out;
+    simWordCache.set(term, result);
+    return result;
   }
 
   async function renderMC() {
@@ -872,14 +879,24 @@
     const samePos = others.filter((o) => o.pos === w.pos);
     const bankPool = (samePos.length ? samePos : others).map((o) => o.english);
 
-    // Similar-meaning words from OUTSIDE the bank, to force precision.
-    const sim = await fetchSimilarWords(w.english);
+    // Related-meaning words from OUTSIDE the bank, to force precision.
+    const { candidates, synonyms } = await fetchSimilar(w.english);
     // Bail if the user advanced or the session ended while we were fetching.
     if (!session || session.current !== w || session.answered) return;
 
+    // A candidate is too close if it's a synonym of the answer or shares a
+    // canonical substring with it (e.g. "gull" ⊂ "seagull") — those read as
+    // also-correct, so drop them.
+    const answerCanons = variants(w.english).map(canonMeaning).filter(Boolean);
+    const tooClose = (word) => {
+      const c = canonMeaning(word);
+      if (!c || synonyms.has(c)) return true;
+      return answerCanons.some((a) => a === c || a.includes(c) || c.includes(a));
+    };
+
     const bankMeanings = new Set(words.map((x) => norm(x.english)));
     const wantTag = POS_TO_DM[w.pos];
-    const simOutside = sim.filter((s) => !bankMeanings.has(norm(s.word)));
+    const simOutside = candidates.filter((s) => !bankMeanings.has(norm(s.word)) && !tooClose(s.word));
     const simMatch = wantTag ? simOutside.filter((s) => s.tags.includes(wantTag)) : simOutside;
     const simRest = simOutside.filter((s) => !simMatch.includes(s));
 
