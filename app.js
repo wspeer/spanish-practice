@@ -1062,6 +1062,11 @@
     // Note: we deliberately don't focus the Next button — Enter-to-advance is
     // handled by the global keydown listener, and focusing it could let one
     // Enter press both fire the button click and the listener (double-advance).
+    // Scroll the Next button into view so it's reachable without manual
+    // scrolling on small screens (no-op when it's already visible).
+    requestAnimationFrame(() => {
+      nextBtn.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   $("#next-btn").addEventListener("click", () => nextQuestion());
