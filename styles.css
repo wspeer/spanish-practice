@@ -273,6 +273,30 @@ kbd {
 #feedback-text .warn-txt { color: var(--warn); }
 #feedback-text .answer { font-weight: 700; }
 
+/* On phones, pin the feedback + Next as a compact bar at the bottom of the
+   screen, so you can answer then tap Next without scrolling. */
+@media (max-width: 640px) {
+  #feedback:not(.hidden) {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    margin: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 20px rgba(20, 30, 50, .18);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  #feedback:not(.hidden) #feedback-text {
+    margin: 0; flex: 1 1 auto; min-width: 0; font-size: .92rem;
+  }
+  #feedback:not(.hidden) #feedback-text .big-verdict { font-size: 1rem; }
+  #feedback:not(.hidden) #next-btn { flex: 0 0 auto; margin: 0; padding: 12px 18px; }
+  /* Room so the last option can scroll clear of the pinned bar. */
+  #practice-active { padding-bottom: 96px; }
+}
+
 /* ---------- Results ---------- */
 #results-detail { margin: 16px 0; }
 .result-row {
